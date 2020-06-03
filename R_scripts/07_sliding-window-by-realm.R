@@ -3,35 +3,41 @@ library(gdata)
 library(evobiR)
 library(tidyverse)
 
-cadillac <- read.csv("./data-processed/intratherm_sliding-window-ready") 
+intratherm <- read.csv("./data-processed/intratherm_sliding-window-ready.csv") 
 
+## subset: 
+cadillac <- subset(intratherm, select = c(genus_species, population_id, acclim_temp, latitude, longitude, 
+                                          genus, species, parameter_value, parameter_tmax_or_tmin, 
+                                          realm_general2, lifespan_days,
+                                          season_when_away_100km_start, season_when_away_100km_stop, 
+                                          season_inactive_start,  season_inactive_stop,
+                                          season_inactive_start2,  season_inactive_stop2,
+                                          maximum_body_size_svl_hbl_cm, elevation_of_collection))
 
 
 ####      TERRESTRIAL       ####
 ################################
-temp_data <- read.csv("./data-processed/arr_terrestrial_temp_data.csv")
+temp_data <- read_csv("./data-processed/arr_temp-data_tavg.csv")
 
+## get rid of duplicate population rows and any marine data 
 terrestrial <- cadillac %>%
-  subset(subset = !is.na(latitude)) %>%
-  subset(subset = !is.na(longitude)) %>%
-  subset(realm_general2 == "Terrestrial")
+  filter(realm_general2 == "Terrestrial")
 
-unique_pairs_unsubsetted <- terrestrial[!duplicated(terrestrial[,c("genus_species", "latitude", "longitude")]),]
+unique_pairs <- subset(terrestrial, !duplicated(terrestrial$population_id)) 
+  
 
-unique_pairs <- unique_pairs_unsubsetted %>%
-  select(c(genus_species, population_id, lifespan_days, season_when_away_100km_start, 
-           season_when_away_100km_stop, season_inactive_start, 
-           season_inactive_stop, latitude, longitude, realm_general2,  maximum_body_size_svl_hbl_cm))
+sd_cumulative <- c()
+experienced_var_mean <- c()
+experienced_var_max <- c()
 
-experienced_var_mean_col <- c()
-experienced_var_max_col <- c()
-
-## for each species, initialize months when away or inactive to TRUE
+## for each terrestrial species:
 num_unique <- 1
-while (num_unique < length(unique_pairs$genus_species) + 1) {
+while (num_unique < nrow(unique_pairs)+1) {
+  
+  print(paste("Marking months when away for population ", num_unique, sep = ""))
   ## mark months that species is away as true 
-  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, jul <- FALSE, 
-              aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
+  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, 
+              jul <- FALSE, aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
   
   if (!is.na(unique_pairs$season_when_away_100km_start[num_unique])) {
     away_start <- unique_pairs$season_when_away_100km_start[num_unique]
@@ -45,82 +51,57 @@ while (num_unique < length(unique_pairs$genus_species) + 1) {
     away_stop <- unique_pairs$season_inactive_stop[num_unique]
     
     months <- initialize_months(away_start, away_stop, months)
+    if (!is.na(unique_pairs$season_inactive_start2[num_unique])) {
+      away_start <- unique_pairs$season_inactive_start2[num_unique]
+      away_stop <- unique_pairs$season_inactive_stop2[num_unique]
+      
+      months <- initialize_months(away_start, away_stop, months)
+    }
   }
   
-  pop_id <- paste(unique_pairs$population_id[num_unique], unique_pairs$longitude[num_unique], sep = "_") 
+  print("Creating temp data frame for population...")
+  ## make dataframe of date and temp values for collection location of that species 
+  pop_id <- unique_pairs$population_id[num_unique]
   
-  ## get temp data for that population 
-  loc <- data.frame(matrix(nrow = 51042))
-  loc[,1] <- temp_data[,1]
-  loc[,2] <- temp_data[,which(colnames(temp_data == pop_id))]
+  loc <- data.frame(matrix(nrow = 32293))
+  loc[,1] <- temp_data$date
+  loc[,2] <-  temp_data[,which(colnames(temp_data) == pop_id)]
   colnames(loc) <- c("date", "temp_value")
   
+  print("Setting temps when away or inactive to NA...")
+  ## set temps to NA:
+  loc <- set_temps_to_NA(column = loc, months = months, realm = "Terrestrial")
   
-  ## iterate through dates in loc by each month, setting temperature values to NA if month = TRUE (if species is away/inactive)
-  ## for each year from 1775-2020 - so 245 iterations of 12 
-  year_index = 1
-  month_index = 1
+  print("Sliding the window...")
+  ## perform sliding window calculations:
+  lifespan <- as.integer(unique_pairs$lifespan_days[num_unique])
   
-  if (sum(is.na(loc$temp_value)) > 3000) {
-    LSV_column_mean <- append(LSV_column_mean, NA, after = length(LSV_column_mean))
-    LSV_column_max <- append(LSV_column_max, NA, after = length(LSV_column_max))
-  }
-  else {
-    while (year_index < 246) {
-      if (isTRUE(months[1])) {
-        loc[month_index, 3] <- NA
-      }
-      if (isTRUE(months[2])) {
-        loc[month_index + 1, 3] <- NA
-      }
-      if (isTRUE(months[3])) {
-        loc[month_index + 2, 3] <- NA
-      }
-      if (isTRUE(months[4])) {
-        loc[month_index + 3, 3] <- NA
-      }
-      if (isTRUE(months[5])) {
-        loc[month_index + 4, 3] <- NA
-      }
-      if (isTRUE(months[6])) {
-        loc[month_index + 5, 3] <- NA
-      }
-      if (isTRUE(months[7])) {
-        loc[month_index + 6, 3] <- NA
-      }
-      if (isTRUE(months[8])) {
-        loc[month_index + 7, 3] <- NA
-      }
-      if (isTRUE(months[9])) {
-        loc[month_index + 8, 3] <- NA
-      }
-      if (isTRUE(months[10])) {
-        loc[month_index + 9, 3] <- NA
-      }
-      if (isTRUE(months[11])) {
-        loc[month_index + 10, 3] <- NA
-      }
-      if (isTRUE(months[12])) {
-        loc[month_index + 11, 3] <- NA
-      }
-      year_index <- year_index + 1
-      month_index <- month_index + 12
-    }
-    
-    ## perform sliding window for location and store LSV in vector column
-    sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, as.integer(unique_pairs$lifespan_days[num_unique]), 1)
-    experienced_var_mean <- mean(sd_vector, na.rm = TRUE)
-    experienced_var_max <- max(sd_vector, na.rm = TRUE)
-    experienced_var_mean_col <- append(experienced_var_mean_col, experienced_var_mean, after = length(experienced_var_mean_col))
-    experienced_var_max_col <- append(experienced_var_max_col, experienced_var_max, after = length(experienced_var_max_col))
+  if(lifespan > nrow(loc)) {
+    lifespan <- as.integer(nrow(loc)/365)
   }
   
+  sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, lifespan, 1)
+  sd = sd_special(loc$temp_value)
+  print(paste("Performed sliding window for ", num_unique, sep = ""))
+  print(paste("Number of days iterating over: ", length(loc$temp_value),sep = ""))
+  
+  ## calculate mean sd and add to experienced variation vectors 
+  pop_experienced_var_mean<- mean(sd_vector, na.rm = TRUE)
+  pop_experienced_var_max<- max(sd_vector, na.rm = TRUE)
+  ##LSV_max <- max(sd_vector, na.rm = TRUE)
+  experienced_var_mean <- append(experienced_var_mean, pop_experienced_var_mean, 
+                                 after = length(experienced_var_mean))
+  experienced_var_max<- append(experienced_var_max, pop_experienced_var_max, 
+                               after = length(experienced_var_max))
+  sd_cumulative <- append(sd_cumulative, sd, after = length(sd_cumulative))
+  
+  print("Done! Moving on to next population :-)")
+  ##move on to next species
   num_unique <- num_unique + 1
-  
 }
 
-unique_pairs$experienced_var_mean <- experienced_var_mean_col
-unique_pairs$experienced_var_max <- experienced_var_max_col
+unique_pairs$experienced_var_mean <- experienced_var_mean
+unique_pairs$experienced_var_max <- experienced_var_max
 
 terrestrial_unique <- unique_pairs
 saveRDS(terrestrial_unique, "./data-processed/terrestrial_expvar.rds")
@@ -129,29 +110,27 @@ saveRDS(terrestrial_unique, "./data-processed/terrestrial_expvar.rds")
 
 ####      FRESHWATER       ####
 ###############################
-temp_data <- read.csv("./data-processed/intratherm-freshwater-temp-data-daily.csv")
+temp_data <- read_csv("./data-processed/arr_freshwater-temp-data.csv")
 
+## get rid of duplicate population rows and any marine data 
 freshwater <- cadillac %>%
-  subset(subset = !is.na(latitude)) %>%
-  subset(subset = !is.na(longitude)) %>%
-  subset(realm_general2 == "Freshwater")
+  filter(realm_general2 == "Freshwater")
 
-unique_pairs_unsubsetted <- freshwater[!duplicated(freshwater[,c("genus_species", "latitude", "longitude")]),]
+unique_pairs <- subset(freshwater, !duplicated(freshwater$population_id)) 
 
-unique_pairs <- unique_pairs_unsubsetted %>%
-  select(c(genus_species, population_id, lifespan_days, season_when_away_100km_start, 
-           season_when_away_100km_stop, season_inactive_start, 
-           season_inactive_stop, latitude, longitude, realm_general2,  maximum_body_size_svl_hbl_cm))
 
-experienced_var_mean_col <- c()
-experienced_var_max_col <- c()
+sd_cumulative <- c()
+experienced_var_mean <- c()
+experienced_var_max <- c()
 
-## for each species, initialize months when away or inactive to TRUE
+## for each terrestrial species:
 num_unique <- 1
-while (num_unique < length(unique_pairs$genus_species) + 1) {
+while (num_unique < nrow(unique_pairs)+1) {
+  
+  print(paste("Marking months when away for population ", num_unique, sep = ""))
   ## mark months that species is away as true 
-  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, jul <- FALSE, 
-              aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
+  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, 
+              jul <- FALSE, aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
   
   if (!is.na(unique_pairs$season_when_away_100km_start[num_unique])) {
     away_start <- unique_pairs$season_when_away_100km_start[num_unique]
@@ -165,82 +144,58 @@ while (num_unique < length(unique_pairs$genus_species) + 1) {
     away_stop <- unique_pairs$season_inactive_stop[num_unique]
     
     months <- initialize_months(away_start, away_stop, months)
+    if (!is.na(unique_pairs$season_inactive_start2[num_unique])) {
+      away_start <- unique_pairs$season_inactive_start2[num_unique]
+      away_stop <- unique_pairs$season_inactive_stop2[num_unique]
+      
+      months <- initialize_months(away_start, away_stop, months)
+    }
   }
   
-  pop_id <- paste(unique_pairs$population_id[num_unique], unique_pairs$longitude[num_unique], sep = "_") 
+  print("Creating temp data frame for population...")
+  ## make dataframe of date and temp values for collection location of that species 
+  pop_id <- unique_pairs$population_id[num_unique]
   
-  ## get temp data for that population 
-  loc <- data.frame(matrix(nrow = ))
-  loc[,1] <- temp_data[,1]
-  loc[,2] <- temp_data[,which(colnames(temp_data == pop_id))]
+  loc <- data.frame(matrix(nrow = 16071))
+  loc[,1] <- temp_data$date
+  loc[,2] <-  temp_data[,which(colnames(temp_data) == pop_id)]
   colnames(loc) <- c("date", "temp_value")
   
+  print("Setting temps when away or inactive to NA...")
+  ## set temps to NA:
+  loc <- set_temps_to_NA(column = loc, months = months, realm = "Freshwater")
   
-  ## iterate through dates in loc by each month, setting temperature values to NA if month = TRUE (if species is away/inactive)
-  ## for each year from 1958-2002 - so 44 iterations of 12 
-  year_index = 1
-  month_index = 1
+  print("Sliding the window...")
   
-  if (sum(is.na(loc$temp_value)) > 3000) {
-    LSV_column_mean <- append(LSV_column_mean, NA, after = length(LSV_column_mean))
-    LSV_column_max <- append(LSV_column_max, NA, after = length(LSV_column_max))
-  }
-  else {
-    while (year_index < 45) {
-      if (isTRUE(months[1])) {
-        loc[month_index, 3] <- NA
-      }
-      if (isTRUE(months[2])) {
-        loc[month_index + 1, 3] <- NA
-      }
-      if (isTRUE(months[3])) {
-        loc[month_index + 2, 3] <- NA
-      }
-      if (isTRUE(months[4])) {
-        loc[month_index + 3, 3] <- NA
-      }
-      if (isTRUE(months[5])) {
-        loc[month_index + 4, 3] <- NA
-      }
-      if (isTRUE(months[6])) {
-        loc[month_index + 5, 3] <- NA
-      }
-      if (isTRUE(months[7])) {
-        loc[month_index + 6, 3] <- NA
-      }
-      if (isTRUE(months[8])) {
-        loc[month_index + 7, 3] <- NA
-      }
-      if (isTRUE(months[9])) {
-        loc[month_index + 8, 3] <- NA
-      }
-      if (isTRUE(months[10])) {
-        loc[month_index + 9, 3] <- NA
-      }
-      if (isTRUE(months[11])) {
-        loc[month_index + 10, 3] <- NA
-      }
-      if (isTRUE(months[12])) {
-        loc[month_index + 11, 3] <- NA
-      }
-      year_index <- year_index + 1
-      month_index <- month_index + 12
-    }
-    
-    ## perform sliding window for location and store LSV in vector column
-    sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, as.integer(unique_pairs$lifespan_days[num_unique]), 1)
-    experienced_var_mean <- mean(sd_vector, na.rm = TRUE)
-    experienced_var_max <- max(sd_vector, na.rm = TRUE)
-    experienced_var_mean_col <- append(experienced_var_mean_col, experienced_var_mean, after = length(experienced_var_mean_col))
-    experienced_var_max_col <- append(experienced_var_max_col, experienced_var_max, after = length(experienced_var_max_col))
+  ## perform sliding window calculations:
+  lifespan <- as.integer(unique_pairs$lifespan_days[num_unique])
+  
+  if(lifespan > nrow(loc)) {
+    lifespan <- as.integer(nrow(loc)/365)
   }
   
+  sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, lifespan, 1)
+  sd = sd_special(loc$temp_value)
+  print(paste("Performed sliding window for ", num_unique, sep = ""))
+  print(paste("Number of days iterating over: ", length(loc$temp_value),sep = ""))
+  
+  ## calculate mean sd and add to experienced variation vectors 
+  pop_experienced_var_mean<- mean(sd_vector, na.rm = TRUE)
+  pop_experienced_var_max<- max(sd_vector, na.rm = TRUE)
+  ##LSV_max <- max(sd_vector, na.rm = TRUE)
+  experienced_var_mean <- append(experienced_var_mean, pop_experienced_var_mean, 
+                                 after = length(experienced_var_mean))
+  experienced_var_max<- append(experienced_var_max, pop_experienced_var_max, 
+                               after = length(experienced_var_max))
+  sd_cumulative <- append(sd_cumulative, sd, after = length(sd_cumulative))
+  
+  print("Done! Moving on to next population :-)")
+  ##move on to next species
   num_unique <- num_unique + 1
-  
 }
 
-unique_pairs$experienced_var_mean <- experienced_var_mean_col
-unique_pairs$experienced_var_max <- experienced_var_max_col
+unique_pairs$experienced_var_mean <- experienced_var_mean
+unique_pairs$experienced_var_max <- experienced_var_max
 
 freshwater_unique <- unique_pairs
 saveRDS(freshwater_unique, "./data-processed/freshwater_expvar.rds")
@@ -251,29 +206,27 @@ saveRDS(freshwater_unique, "./data-processed/freshwater_expvar.rds")
 
 ####         MARINE         ####
 ################################
-temp_data <- read.csv("./data-processed/intratherm-marine-temp-data.csv")
+temp_data <- read_csv("./data-processed/arr_marine-temp-data.csv")
 
+## get rid of duplicate population rows and any marine data 
 marine <- cadillac %>%
-  subset(subset = !is.na(latitude)) %>%
-  subset(subset = !is.na(longitude)) %>%
-  subset(realm_general2 == "Marine")
+  filter(realm_general2 == "Marine")
 
-unique_pairs_unsubsetted <- marine[!duplicated(marine[,c("genus_species", "latitude", "longitude")]),]
+unique_pairs <- subset(marine, !duplicated(marine$population_id)) 
 
-unique_pairs <- unique_pairs_unsubsetted %>%
-  select(c(genus_species, population_id, lifespan_days, season_when_away_100km_start, 
-           season_when_away_100km_stop, season_inactive_start, 
-           season_inactive_stop, latitude, longitude, realm_general2,  maximum_body_size_svl_hbl_cm))
 
-experienced_var_mean_col <- c()
-experienced_var_max_col <- c()
+sd_cumulative <- c()
+experienced_var_mean <- c()
+experienced_var_max <- c()
 
-## for each species, initialize months when away or inactive to TRUE
+## for each terrestrial species:
 num_unique <- 1
-while (num_unique < length(unique_pairs$genus_species) + 1) {
+while (num_unique < nrow(unique_pairs)+1) {
+  
+  print(paste("Marking months when away for population ", num_unique, sep = ""))
   ## mark months that species is away as true 
-  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, jul <- FALSE, 
-              aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
+  months <- c(jan <- FALSE, feb <- FALSE, mar <- FALSE, apr <- FALSE, may <- FALSE, jun <- FALSE, 
+              jul <- FALSE, aug <- FALSE, sep <- FALSE, oct <- FALSE, nov <- FALSE, dec <- FALSE)
   
   if (!is.na(unique_pairs$season_when_away_100km_start[num_unique])) {
     away_start <- unique_pairs$season_when_away_100km_start[num_unique]
@@ -287,112 +240,51 @@ while (num_unique < length(unique_pairs$genus_species) + 1) {
     away_stop <- unique_pairs$season_inactive_stop[num_unique]
     
     months <- initialize_months(away_start, away_stop, months)
+    if (!is.na(unique_pairs$season_inactive_start2[num_unique])) {
+      away_start <- unique_pairs$season_inactive_start2[num_unique]
+      away_stop <- unique_pairs$season_inactive_stop2[num_unique]
+      
+      months <- initialize_months(away_start, away_stop, months)
+    }
   }
   
-  pop_id <- paste(unique_pairs$population_id[num_unique], unique_pairs$longitude[num_unique], sep = "_") 
+  print("Creating temp data frame for population...")
+  ## make dataframe of date and temp values for collection location of that species 
+  pop_id <- unique_pairs$population_id[num_unique]
   
-  ## get temp data for that population 
-  loc <- data.frame(matrix(nrow = ))
-  loc[,1] <- temp_data[,1]
-  loc[,2] <- temp_data[,which(colnames(temp_data == pop_id))]
+  loc <- data.frame(matrix(nrow = 14096))
+  loc[,1] <- temp_data$date
+  loc[,2] <-  temp_data[,which(colnames(temp_data) == pop_id)]
   colnames(loc) <- c("date", "temp_value")
   
+  print("Setting temps when away or inactive to NA...")
+  ## set temps to NA:
+  loc <- set_temps_to_NA(column = loc, months = months, realm = "Marine")
   
-  ## iterate through dates in loc by each month, setting temperature values to NA if month = TRUE (if species is away/inactive)
-  ## for each year from "1981-09-01" to "2020-04-04" - so 245 iterations of 12 
-  year_index = 1
-  month_index = 1
+  print("Sliding the window...")
+  ## perform sliding window calculations:
+  sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, as.integer(unique_pairs$lifespan_days[num_unique]), 1)
+  sd = sd_special(loc$temp_value)
+  print(paste("Performed sliding window for ", num_unique, sep = ""))
+  print(paste("Number of days iterating over: ", length(loc$temp_value),sep = ""))
   
-  if (sum(is.na(loc$temp_value)) > 3000) {
-    LSV_column_mean <- append(LSV_column_mean, NA, after = length(LSV_column_mean))
-    LSV_column_max <- append(LSV_column_max, NA, after = length(LSV_column_max))
-  }
-  else {
-    while (year_index < 41) {
-      if (year_index == 1) {
-        if (isTRUE(months[9])) {
-          loc[month_index, 3] <- NA
-        }
-        if (isTRUE(months[10])) {
-          loc[month_index + 1, 3] <- NA
-        }
-        if (isTRUE(months[11])) {
-          loc[month_index + 2, 3] <- NA
-        }
-        if (isTRUE(months[12])) {
-          loc[month_index + 3, 3] <- NA
-        }
-      }
-      else if (year_index == 39) {
-        if (isTRUE(months[1])) {
-          loc[month_index, 3] <- NA
-        }
-        if (isTRUE(months[2])) {
-          loc[month_index + 1, 3] <- NA
-        }
-        if (isTRUE(months[3])) {
-          loc[month_index + 2, 3] <- NA
-        }
-        if (isTRUE(months[4])) {
-          loc[month_index + 3, 3] <- NA
-        }
-      }
-      else {
-        if (isTRUE(months[1])) {
-          loc[month_index, 3] <- NA
-        }
-        if (isTRUE(months[2])) {
-          loc[month_index + 1, 3] <- NA
-        }
-        if (isTRUE(months[3])) {
-          loc[month_index + 2, 3] <- NA
-        }
-        if (isTRUE(months[4])) {
-          loc[month_index + 3, 3] <- NA
-        }
-        if (isTRUE(months[5])) {
-          loc[month_index + 4, 3] <- NA
-        }
-        if (isTRUE(months[6])) {
-          loc[month_index + 5, 3] <- NA
-        }
-        if (isTRUE(months[7])) {
-          loc[month_index + 6, 3] <- NA
-        }
-        if (isTRUE(months[8])) {
-          loc[month_index + 7, 3] <- NA
-        }
-        if (isTRUE(months[9])) {
-          loc[month_index + 8, 3] <- NA
-        }
-        if (isTRUE(months[10])) {
-          loc[month_index + 9, 3] <- NA
-        }
-        if (isTRUE(months[11])) {
-          loc[month_index + 10, 3] <- NA
-        }
-        if (isTRUE(months[12])) {
-          loc[month_index + 11, 3] <- NA
-        }
-      }
-      year_index <- year_index + 1
-      month_index <- month_index + 12
-    }
-    
-    ## perform sliding window for location and store LSV in vector column
-    sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, as.integer(unique_pairs$lifespan_days[num_unique]), 1)
-    experienced_var_mean <- mean(sd_vector, na.rm = TRUE)
-    experienced_var_max <- max(sd_vector, na.rm = TRUE)
-    experienced_var_mean_col <- append(experienced_var_mean_col, experienced_var_mean, after = length(experienced_var_mean_col))
-    experienced_var_max_col <- append(experienced_var_max_col, experienced_var_max, after = length(experienced_var_max_col))
-  }
+  ## calculate mean sd and add to experienced variation vectors 
+  pop_experienced_var_mean<- mean(sd_vector, na.rm = TRUE)
+  pop_experienced_var_max<- max(sd_vector, na.rm = TRUE)
+  ##LSV_max <- max(sd_vector, na.rm = TRUE)
+  experienced_var_mean <- append(experienced_var_mean, pop_experienced_var_mean, 
+                                 after = length(experienced_var_mean))
+  experienced_var_max<- append(experienced_var_max, pop_experienced_var_max, 
+                               after = length(experienced_var_max))
+  sd_cumulative <- append(sd_cumulative, sd, after = length(sd_cumulative))
   
+  print("Done! Moving on to next population :-)")
+  ##move on to next species
   num_unique <- num_unique + 1
-  
 }
 
-unique_pairs$experienced_var_mean <- experienced_var_mean_col
-unique_pairs$experienced_var_max <- experienced_var_max_col
+unique_pairs$experienced_var_mean <- experienced_var_mean
+unique_pairs$experienced_var_max <- experienced_var_max
 
 marine_unique <- unique_pairs
 saveRDS(marine_unique, "./data-processed/marine_expvar.rds")
@@ -400,10 +292,16 @@ saveRDS(marine_unique, "./data-processed/marine_expvar.rds")
 
 
 
+## combine all of the output into one and then merge with intratherm ------------
+combined_unique <- rbind(marine_unique, terrestrial_unique, freshwater_unique)
+combined_unique <- combined_unique %>%
+  select(population_id, experienced_var_mean, experienced_var_max)
+
+merged <- left_join(intratherm, combined_unique)
 
 
-
-
+## write to new file: 
+write.csv(merged, "./data-processed/arr_sliding-window-by-realm-output.csv", row.names = FALSE)
 
 
 #
@@ -428,6 +326,201 @@ sd_special <- function(x) {
 IquantileR_special <- function(x) {
   return(quantile(x, probs=0.975, na.rm = TRUE) - quantile(x, probs=0.025, na.rm = TRUE))
 }
+
+#
+###
+#######
+##############
+##########################
+############################################
+###########################################################################
+# FUNCTION FOR SETTING TEMP DATA TO NA DURING SEASON WHEN AWAY/INACTIVE ###
+###########################################################################
+## takes a temp data frame with columns for each population's temp data and a realm argument specifying which dataset the temp data came from 
+## column names must contain the population's genus_species name
+## returns a new version of the temp_data with temps during seasons away and seasons inactive set to NA
+set_temps_to_NA <- function(column, realm, months) {
+
+    ## set temps in column to NA 
+    ## different conditions for each realm since all have different start and stop dates for temp data
+    if (realm == "Terrestrial") {
+      max <- 2019
+      rep <- 1930
+      day_index <- 1 
+    }
+    else if (realm == "Marine") {
+      ## 1981-09-01 to 2020-04-04
+      max = 2021
+      rep = 1982
+      day_index <- 1
+    }
+    else if (realm == "Freshwater") {
+      max = 2002
+      rep = 1958
+      day_index <- 1
+    }
+    
+    while (rep < max) {
+      if (rep == 2019) {
+        if (isTRUE(months[1])) {
+          column[day_index:(day_index + 30),] <- NA
+        }
+        if (isTRUE(months[2])) {
+          column[(day_index + 30):(day_index + 58),] <- NA
+        }
+        if (isTRUE(months[3])) {
+          column[(day_index + 58):(day_index + 89),] <- NA
+        }
+        if (isTRUE(months[4])) {
+          column[(day_index + 89):(day_index + 119),] <- NA
+        }
+        if (isTRUE(months[5])) {
+          column[(day_index + 119):(day_index + 150),] <- NA
+        }
+        if (isTRUE(months[6])) {
+          column[(day_index + 150):(day_index + 180),] <- NA
+        }
+        if (isTRUE(months[7])) {
+          column[(day_index + 180):(day_index + 211),] <- NA
+        }
+        if (isTRUE(months[8])) {
+          column[(day_index + 211):(day_index + 242),] <- NA
+        }
+        if (isTRUE(months[9])) {
+          column[(day_index + 242):(day_index + 272),] <- NA
+        }
+        print(paste("Initialized ", rep, " months to NA - last year!", sep = ""))
+        rep <- rep + 1
+        day_index <- day_index + 365
+      }
+      else if (rep == 1900) {
+        if (isTRUE(months[1])) {
+          column[day_index:(day_index + 30),] <- NA
+        }
+        if (isTRUE(months[2])) {
+          column[(day_index + 30):(day_index + 58),] <- NA
+        }
+        if (isTRUE(months[3])) {
+          column[(day_index + 58):(day_index + 89),] <- NA
+        }
+        if (isTRUE(months[4])) {
+          column[(day_index + 89):(day_index + 119),] <- NA
+        }
+        if (isTRUE(months[5])) {
+          column[(day_index + 119):(day_index + 150),] <- NA
+        }
+        if (isTRUE(months[6])) {
+          column[(day_index + 150):(day_index + 180),] <- NA
+        }
+        if (isTRUE(months[7])) {
+          column[(day_index + 180):(day_index + 211),] <- NA
+        }
+        if (isTRUE(months[8])) {
+          column[(day_index + 211):(day_index + 242),] <- NA
+        }
+        if (isTRUE(months[9])) {
+          column[(day_index + 242):(day_index + 272),] <- NA
+        }
+        if (isTRUE(months[10])) {
+          column[(day_index + 272):(day_index + 303),] <- NA
+        }
+        if (isTRUE(months[11])) {
+          column[(day_index + 303):(day_index + 333),] <- NA
+        }
+        if (isTRUE(months[12])) {
+          column[(day_index + 333):(day_index + 364),] <- NA
+        }
+        print(paste("Initialized ", rep, " months to NA (not a leap year)", sep = ""))
+        rep <- rep + 1
+        day_index <- day_index + 365
+      }
+      else if (rep %% 4 == 0) {
+        if (isTRUE(months[1])) {
+          column[day_index:(day_index + 30),] <- NA
+        }
+        if (isTRUE(months[2])) {
+          column[(day_index + 30):(day_index + 59),] <- NA
+        }
+        if (isTRUE(months[3])) {
+          column[(day_index + 59):(day_index + 90),] <- NA
+        }
+        if (isTRUE(months[4])) {
+          column[(day_index + 90):(day_index + 120),] <- NA
+        }
+        if (isTRUE(months[5])) {
+          column[(day_index + 120):(day_index + 151),] <- NA
+        }
+        if (isTRUE(months[6])) {
+          column[(day_index + 151):(day_index + 181),] <- NA
+        }
+        if (isTRUE(months[7])) {
+          column[(day_index + 181):(day_index + 212),] <- NA
+        }
+        if (isTRUE(months[8])) {
+          column[(day_index + 212):(day_index + 243),] <- NA
+        }
+        if (isTRUE(months[9])) {
+          column[(day_index + 243):(day_index + 273),] <- NA
+        }
+        if (isTRUE(months[10])) {
+          column[(day_index + 273):(day_index + 304),] <- NA
+        }
+        if (isTRUE(months[11])) {
+          column[(day_index + 304):(day_index + 334),] <- NA
+        }
+        if (isTRUE(months[12])) {
+          column[(day_index + 334):(day_index + 365),] <- NA
+        }
+        print(paste("Initialized ", rep, " months to NA (leap year)", sep = ""))
+        rep <- rep + 1
+        day_index <- day_index + 366
+      }
+      else {
+        if (isTRUE(months[1])) {
+          column[day_index:(day_index + 30),] <- NA
+        }
+        if (isTRUE(months[2])) {
+          column[(day_index + 30):(day_index + 58),] <- NA
+        }
+        if (isTRUE(months[3])) {
+          column[(day_index + 58):(day_index + 89),] <- NA
+        }
+        if (isTRUE(months[4])) {
+          column[(day_index + 89):(day_index + 119),] <- NA
+        }
+        if (isTRUE(months[5])) {
+          column[(day_index + 119):(day_index + 150),] <- NA
+        }
+        if (isTRUE(months[6])) {
+          column[(day_index + 150):(day_index + 180),] <- NA
+        }
+        if (isTRUE(months[7])) {
+          column[(day_index + 180):(day_index + 211),] <- NA
+        }
+        if (isTRUE(months[8])) {
+          column[(day_index + 211):(day_index + 242),] <- NA
+        }
+        if (isTRUE(months[9])) {
+          column[(day_index + 242):(day_index + 272),] <- NA
+        }
+        if (isTRUE(months[10])) {
+          column[(day_index + 272):(day_index + 303),] <- NA
+        }
+        if (isTRUE(months[11])) {
+          column[(day_index + 303):(day_index + 333),] <- NA
+        }
+        if (isTRUE(months[12])) {
+          column[(day_index + 333):(day_index + 364),] <- NA
+        }
+        print(paste("Initialized ", rep, " months to NA (not a leap year)", sep = ""))
+        rep <- rep + 1
+        day_index <- day_index + 365
+      }
+    }
+  return(column)
+}
+
+
 #
 ###
 #######

@@ -5,22 +5,32 @@ library(rerddap)
 library(ncdf4)
 
 ## bring in population data
-cadillac <- read.csv("./data-processed/intratherm-may-2020-squeaky-clean.csv")
+cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
 
-## filter out rows of data we cannot use and that are not marine
+## filter out rows of data we cannot use  
+cadillac <- cadillac %>%
+  filter(!is.na(latitude)) %>%
+  filter(!is.na(longitude)) %>%
+  filter(!is.na(acclim_temp)) %>%
+  filter(!is.na(lifespan_days)) %>%
+  filter(lifespan_days != "unk" || "kunk") %>%
+  filter(parameter_tmax_or_tmin == "tmax") 
+
+cadillac <- droplevels(cadillac)
+
+
+## filter out rows of data that are not marine
 marine <- cadillac %>%
-	subset(subset = !is.na(latitude)) %>%
-	subset(subset = !is.na(longitude)) %>%
 	filter(realm_general2 == "Marine")
 
 marine <- droplevels(marine)
 
 ## get rid of populations with same latitude, longitude and elevation since all will have the same temp data
-unique_pairs <- marine[!duplicated(marine[,c("latitude", "longitude", "elevation_of_collection")]),]
+unique_pairs <- marine[!duplicated(marine[,c("latitude", "longitude")]),]
 
 
 ## load info about NOAA data:
-info <- info("ncdcOisst2Agg_LonPM180")
+info <- info("ncdcOisst21Agg_LonPM180")
 
 
 ## make latitude and longitude vectors based on NOAA format
@@ -63,7 +73,7 @@ colnames(temperature_data) = c("date")
 
 ## loop through each population getting temp data for its grid cell and adding to temp data
 num_unique <- 1
-while (num_unique < length(unique_pairs$population_id) + 1) {
+while (num_unique < nrow(unique_pairs) + 1) {
 	print(paste("On population number", num_unique))
 	time_series <- griddap(info,
 						   time = c("1981-09-01", "2020-04-04"), 
@@ -79,7 +89,7 @@ while (num_unique < length(unique_pairs$population_id) + 1) {
 	}
 	
 	temperature_data$temp <- temps
-	pop_id <- paste(unique_pairs$population_id[num_unique], unique_pairs$longitude[num_unique], sep = "_")
+	pop_id <- as.character(paste(unique_pairs$genus_species[num_unique], unique_pairs$latitude[num_unique],unique_pairs$longitude[num_unique], sep = "_"))
 	colnames(temperature_data)[num_unique+1]<- pop_id
 	
 	print("Stored data in temperature_data and moving on to next population!")
@@ -87,8 +97,41 @@ while (num_unique < length(unique_pairs$population_id) + 1) {
 	num_unique <- num_unique + 1
 }
 
-precious_marine_temps <- temperature_data
-saveRDS(precious_marine_temps, "~/Documents/SUNDAY LAB/Intratherm/Data sheets/precious_marine_temps.rds")
+precious_marine_temps_arr <- temperature_data
 
-temperature_data <- readRDS("~/Documents/SUNDAY LAB/Intratherm/Data sheets/precious_marine_temps.rds")
+temperature_data <- readRDS("~/Documents/SUNDAY LAB/Intratherm/Data sheets/precious_marine_temps_arr.rds")
 
+
+## add rows for populations with the same lat, long and elevation but different species 
+## will have same temperature data 
+populations <- marine[!duplicated(marine[,c("genus_species", "latitude", "longitude")]),]
+
+i <- 1
+while (i < nrow(unique_pairs) + 1) {
+  z <- 1
+  while (z < nrow(populations) + 1) {
+    same_pop <- (unique_pairs$latitude[i] == populations$latitude[z] & 
+                   unique_pairs$longitude[i] == populations$longitude[z] & 
+                   unique_pairs$genus_species[i] == populations$genus_species[z])
+    
+    same_loc <- (unique_pairs$latitude[i] == populations$latitude[z] & 
+                   unique_pairs$longitude[i] == populations$longitude[z])
+    
+    if (!same_pop & same_loc) {
+      temperature_data$temps <- temperature_data[,i+1]
+      pop_id <- as.character(paste(populations$genus_species[z], populations$latitude[z],populations$longitude[z], sep = "_"))
+      colnames(temperature_data)[length(temperature_data)]<- pop_id
+      same_pop = FALSE
+      same_loc = FALSE
+      z = z+1
+    }
+    else {
+      z = z+1
+    }
+  }
+  i = i+1
+}
+
+
+## write to file:
+write.csv(temperature_data, "./data-processed/arr_marine-temp-data.csv", row.names = FALSE)

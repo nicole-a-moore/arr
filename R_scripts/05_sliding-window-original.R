@@ -32,15 +32,15 @@ write.csv(intratherm, "./data-processed/intratherm_sliding-window-ready.csv", ro
 ## begin sliding window 
 temp_data <- read_csv("./data-processed/arr_temp-data.csv")
 
-intratherm <- cadillac 
+cadillac <- intratherm 
 
 ## subset:
 cadillac <- subset(cadillac, select = c(genus_species, population_id, acclim_temp, latitude, longitude, 
                                     genus, species, parameter_value, parameter_tmax_or_tmin, 
                                     realm_general2, lifespan_days,
                                     season_when_away_100km_start, season_when_away_100km_stop, 
-                                    season_inactive_start,  season_inactive_stop,
-                                    maximum_body_size_svl_hbl_cm, elevation_of_collection))
+                                    season_inactive_start,  season_inactive_stop, season_inactive_start2,
+                                    season_inactive_stop2, maximum_body_size_svl_hbl_cm, elevation_of_collection))
 
 ## get rid of duplicate population rows and any marine data 
 unique_pairs <- subset(cadillac, !duplicated(cadillac$population_id)) %>%
@@ -71,6 +71,12 @@ while (num_unique < nrow(unique_pairs)+1) {
     away_stop <- unique_pairs$season_inactive_stop[num_unique]
     
     months <- initialize_months(away_start, away_stop, months)
+    if (!is.na(unique_pairs$season_inactive_start2[num_unique])) {
+      away_start <- unique_pairs$season_inactive_start2[num_unique]
+      away_stop <- unique_pairs$season_inactive_stop2[num_unique]
+      
+      months <- initialize_months(away_start, away_stop, months)
+    }
   }
   
   print("Creating temp data frame for population...")

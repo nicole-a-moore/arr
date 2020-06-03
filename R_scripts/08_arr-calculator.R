@@ -44,10 +44,6 @@ intratherm <- left_join(intratherm, arr, by = "population_id")
 write.csv(intratherm, "./data-processed/arr_sliding-window-output-with-arr.csv", row.names = FALSE)
 
 
-
-
-
-
 ##get rid of duplicated rows since acclimation temp no longer matters, get rid of negative ARRs
 intratherm2 <- intratherm %>%
   filter(!duplicated(intratherm$population_id)) %>%
@@ -189,3 +185,45 @@ ggplot(intratherm2, aes(x = maximum_body_size_svl_hbl_cm, y = ARR)) +
 ggplot(intratherm2, aes(x = abs(latitude), y = lifespan_days)) + 
   geom_point() + 
   geom_smooth(method = "lm")
+
+
+
+
+
+
+
+### ARR by realm 
+intratherm <- read.csv( "./data-processed/arr_sliding-window-by-realm-output.csv") 
+
+#make groups of each species for every lat and long
+arr <- intratherm %>%
+  mutate(acclim_temp = as.numeric(as.character(acclim_temp))) %>%
+  group_by(population_id) %>%
+  do(tidy(lm(parameter_value ~ acclim_temp, data = .), conf.int = TRUE)) %>% #fit lm to each group, the slope is ARR
+  filter(term == "acclim_temp") %>% #extract just the slopes - get rid of intercept 
+  dplyr::rename(ARR = estimate) #rename these ARR
+
+## plot the ARR linear models to visualize:
+g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, col = population_id)) + 
+  geom_point(size = 1, alpha = 0.1) +
+  geom_errorbar(aes(ymin=parameter_value-error_estimate, ymax=parameter_value+error_estimate), 
+                alpha = 0.1, width=0) +
+  geom_smooth(method = "lm", se = FALSE, size = 0.4, alpha = 0.1) +
+  theme_minimal() + 
+  theme(legend.position = "none", panel.border = element_rect(colour = "dimgrey", fill = NA), 
+        panel.grid.minor = element_line(colour = "white"), 
+        panel.grid.major = element_line(colour = "white"), 
+        plot.title = element_text(hjust = 0.5)) + 
+  labs(x = "Acclimation temperature (°C)", y = "Upper critical thermal limit (°C)") + 
+  scale_color_manual(values = magma(625))
+
+ggsave("./Figures/ARR-model-fits-all-by-realm.png", g)
+
+## merge ARR results for each popultion back to intratherm
+arr <- arr %>%
+  select(-term)
+
+intratherm <- left_join(intratherm, arr, by = "population_id")
+
+## write to csv
+write.csv(intratherm, "./data-processed/arr_sliding-window-by-realm-output-with-arr.csv", row.names = FALSE)
