@@ -4,6 +4,7 @@ library(RColorBrewer)
 library(lattice)
 library(ncdf4)
 library(janitor)
+library(tidyverse)
 
 ## read in gridded data in nc file for the file_index from berkeley earth and store data in R workspace 
 filename <- paste("./Gridded_daily_TMAX/Complete_TMAX_Daily_LatLong1_1880.nc", sep = "")
@@ -17,7 +18,7 @@ long <- ncvar_get(ncfile, "longitude")
 nc_close(ncfile)
 
 ## bring in data
-cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
+cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.txt")
 
 ## filter out rows of data we cannot use  
 cadillac <- cadillac %>%
