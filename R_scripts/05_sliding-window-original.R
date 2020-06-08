@@ -3,7 +3,7 @@ library(gdata)
 library(evobiR)
 library(tidyverse)
 
-intratherm <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
+intratherm <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.txt")
 
 ## filter out rows of data we cannot use for tmax, sliding window/ARR analysis: no location data, no acclimation, tmin rows, no lifespan 
 intratherm <- intratherm %>%
@@ -11,16 +11,15 @@ intratherm <- intratherm %>%
   filter(!is.na(longitude)) %>%
   filter(!is.na(acclim_temp)) %>%
   filter(!is.na(lifespan_days)) %>%
-  filter(lifespan_days != "unk") %>%
-  filter(lifespan_days != "kunk") %>%
+  filter(lifespan_days != "unk"|| "kunk") %>%
   filter(parameter_tmax_or_tmin == "tmax") 
 intratherm <- drop.levels(intratherm)
-  
-## convert seasons when away and inactive 
-intratherm <- convert_seasons_to_numeric(intratherm)
 
 ## convert lifespan to numeric
 intratherm$lifespan_days <- as.numeric(as.character(intratherm$lifespan_days))
+  
+## convert seasons when away and inactive 
+intratherm <- convert_seasons_to_numeric(intratherm)
 
 ## create pop_id in the same form as temp data 
 intratherm <- intratherm %>%
@@ -94,15 +93,25 @@ while (num_unique < nrow(unique_pairs)+1) {
   
   print("Sliding the window...")
   ## perform sliding window calculations:
-  sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, as.integer(unique_pairs$lifespan_days[num_unique]), 1)
-  sd = sd_special(loc$temp_value)
-  print(paste("Performed sliding window for ", num_unique, sep = ""))
-  print(paste("Number of days iterating over: ", length(loc$temp_value),sep = ""))
+  lifespan <- as.integer(unique_pairs$lifespan_days[num_unique])
   
-  ## calculate mean sd and add to experienced variation vectors 
-  pop_experienced_var_mean<- mean(sd_vector, na.rm = TRUE)
-  pop_experienced_var_max<- max(sd_vector, na.rm = TRUE)
-  ##LSV_max <- max(sd_vector, na.rm = TRUE)
+  if(!is.na(lifespan)) {
+    if(lifespan > nrow(loc)) {
+      lifespan <- as.integer(nrow(loc)/365)
+    }
+    sd_vector <- SlidingWindow(FUN = sd_special, loc$temp_value, lifespan, 1)
+    print(paste("Performed sliding window for ", num_unique, sep = ""))
+    print(paste("Number of days iterating over: ", length(loc$temp_value),sep = ""))
+    ## calculate mean sd and add to experienced variation vectors 
+    pop_experienced_var_mean<- mean(sd_vector, na.rm = TRUE)
+    pop_experienced_var_max<- max(sd_vector, na.rm = TRUE)
+  }
+  else {
+    pop_experienced_var_mean = NA
+    pop_experienced_var_max = NA
+  }
+  sd = sd_special(loc$temp_value)
+  
   experienced_var_mean <- append(experienced_var_mean, pop_experienced_var_mean, 
                                  after = length(experienced_var_mean))
   experienced_var_max<- append(experienced_var_max, pop_experienced_var_max, 

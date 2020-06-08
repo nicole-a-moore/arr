@@ -30,7 +30,7 @@ g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, col = po
         panel.grid.major = element_line(colour = "white"), 
         plot.title = element_text(hjust = 0.5)) + 
   labs(x = "Acclimation temperature (°C)", y = "Upper critical thermal limit (°C)") + 
-  scale_color_manual(values = magma(625))
+  scale_color_manual(values = magma(726))
 
 ggsave("./Figures/ARR-model-fits-all.png", g)
 
