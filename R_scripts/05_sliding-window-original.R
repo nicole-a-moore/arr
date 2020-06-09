@@ -3,7 +3,7 @@ library(gdata)
 library(evobiR)
 library(tidyverse)
 
-intratherm <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.txt")
+intratherm <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
 
 ## filter out rows of data we cannot use for tmax, sliding window/ARR analysis: no location data, no acclimation, tmin rows, no lifespan 
 intratherm <- intratherm %>%

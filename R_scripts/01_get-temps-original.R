@@ -18,7 +18,7 @@ long <- ncvar_get(ncfile, "longitude")
 nc_close(ncfile)
 
 ## bring in data
-cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.txt")
+cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
 
 ## filter out rows of data we cannot use  
 cadillac <- cadillac %>%
