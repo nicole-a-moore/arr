@@ -10,6 +10,7 @@ library(nlme)
 ## read in files
 intratherm <- read.csv( "./data-processed/arr_sliding-window-output.csv") ## version of the database with only usable data and experienced variation column 
 
+## get ARR:
 #make groups of each species for every lat and long
 arr <- intratherm %>%
   mutate(acclim_temp = as.numeric(as.character(acclim_temp))) %>%
@@ -18,7 +19,28 @@ arr <- intratherm %>%
   filter(term == "acclim_temp") %>% #extract just the slopes - get rid of intercept 
   dplyr::rename(ARR = estimate) #rename these ARR
 
-## plot the ARR linear models to visualize:
+## merge ARR results for each popultion back to intratherm
+arr <- arr %>%
+  select(-term)
+
+intratherm <- left_join(intratherm, arr, by = "population_id")
+
+## write to csv
+write.csv(intratherm, "./data-processed/arr_sliding-window-output-with-arr.csv", row.names = FALSE)
+
+## write to file to make map + taxonomic breakdown from
+model_input <- intratherm %>%
+  filter(!duplicated(population_id)) %>%
+  filter(as.numeric(as.character(ARR)) > -0.15) %>%
+  filter(!is.na(experienced_var_mean)) %>%
+  filter(!is.na(ARR))
+
+write.csv(intratherm2, "./data-processed/arr_map-and-model-input.csv", row.names = FALSE)
+
+
+
+
+## plot all of the ARR linear models to visualize:
 g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, col = population_id)) + 
   geom_point(size = 1, alpha = 0.1) +
   geom_errorbar(aes(ymin=parameter_value-error_estimate, ymax=parameter_value+error_estimate), 
@@ -32,31 +54,20 @@ g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, col = po
   labs(x = "Acclimation temperature (°C)", y = "Upper critical thermal limit (°C)") + 
   scale_color_manual(values = magma(726))
 
-ggsave("./Figures/ARR-model-fits-all.png", g)
+ggsave(path = "./Figures/", filename = "ARR-model-fits-all.png", g, height = 6, width = 9)
 
-## merge ARR results for each popultion back to intratherm
-arr <- arr %>%
-  select(-term)
-
-intratherm <- left_join(intratherm, arr, by = "population_id")
-
-## write to csv
-write.csv(intratherm, "./data-processed/arr_sliding-window-output-with-arr.csv", row.names = FALSE)
-
-
-##get rid of duplicated rows since acclimation temp no longer matters, get rid of negative ARRs
-intratherm2 <- intratherm %>%
-  filter(!duplicated(intratherm$population_id)) %>%
-  filter(as.numeric(as.character(ARR)) > -0.15)
-
-write.csv(intratherm2, "~/Documents/SUNDAY LAB/Intratherm/Data sheets/phylo_input.csv")
+## plot only ones included in model fitting 
+model_input_arr_fig <- intratherm %>%
+  filter(as.numeric(as.character(ARR)) > -0.15) %>%
+  filter(!is.na(experienced_var_mean)) %>%
+  filter(!is.na(ARR))
 
 ## colour plot by experienced variation metric 
-g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, group = population_id, 
+g = ggplot(data = model_input_arr_fig, aes(x = acclim_temp, y = parameter_value, group = population_id, 
                               col = experienced_var_mean)) + 
   geom_point(size = 1, alpha = 0.5) + 
-  geom_errorbar(aes(ymin=parameter_value-error_estimate,ymax=parameter_value+error_estimate),
-                width=0, alpha = 0.5) +
+  geom_errorbar(aes(ymin = parameter_value - error_estimate, ymax = parameter_value + error_estimate),
+                width = 0, alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE, size = 0.4, alpha = 0.1) +
   theme_minimal() + 
   theme(panel.border = element_rect(colour = "dimgrey", fill = NA), 
@@ -66,7 +77,10 @@ g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, group = 
        colour = paste(" Mean", "\n", "experienced", "\n", "variation")) +
   scale_colour_viridis_c(option = "A")
 
-ggsave("./Figures/ARR-model-fits-col-is-exp-var.png", g)
+ggsave(path = "./Figures/", filename = "ARR-model-fits-col-is-exp-var.png", g, height = 6, width = 10)
+
+
+
 
 ## linear model of experienced_var_mean weighted by 1/variance of ARR stope estimate
 ## just kidding, scrap this because most ARR don't have an error estimate
@@ -89,11 +103,6 @@ ggplot(intratherm2, aes(x = experienced_var_mean, y = ARR, col = abs(latitude)))
 
 
 
-## write to file to make map + taxonomic breakdown from
-intratherm2 <- intratherm2 %>%
-  filter(realm_general2 != "Marine") 
-
-write.csv(intratherm2, "./data-processed/arr_map-and-model-input.csv", row.names = FALSE)
 
 ## lm with max sd
 lm_output_all_max<- intratherm2 %>%

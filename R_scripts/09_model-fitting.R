@@ -5,7 +5,14 @@ library(lme4)
 library(tidyverse)
 library(broom)
 
-data <- read.csv("./data-processed/arr_map-and-model-input.csv")
+data <- read.csv("./data-processed/arr_sliding-window-output-with-arr.csv")
+
+## get rid of multiple rows per population and ARRs less than 0.15
+model_input <- data %>%
+  filter(!duplicated(population_id)) %>%
+  filter(as.numeric(as.character(ARR)) > -0.15) %>%
+  filter(!is.na(experienced_var_mean)) %>%
+  filter(!is.na(ARR))
 
 ## figure making for paper:
 data$ARR[which.min(data$experienced_var_mean)]
@@ -18,7 +25,7 @@ beta = c(y1, y2)
 
 geom_abline(a = 0.224658873, b = 0.005559816, from = 0, to = 12) 
 
-g = ggplot(data, aes(x = experienced_var_mean, y = ARR, col = abs(latitude))) + 
+g = ggplot(model_input, aes(x = experienced_var_mean, y = ARR, col = abs(latitude))) + 
   geom_point() + 
   geom_smooth(method = "lm", color = "black") + 
   geom_errorbar(aes(ymin=ARR-std.error, ymax=ARR+std.error), width=0) + 
@@ -39,16 +46,16 @@ fit1 <- lm(ARR ~ experienced_var_mean, data = data)
 ### linear mixed effect models accounting for relatedness using a nested grouping structure: 
 # experienced_var_mean
 fit5 <- lme(ARR ~ experienced_var_mean, random = ~1|order/family/genus/species, 
-            data = data, na.action= NULL)
+            data = model_input, na.action= NULL)
 # experienced_var_mean + body size
 fit6 <- lme(ARR ~ experienced_var_mean*maximum_body_size_svl_hbl_cm, random = ~1|order/family/genus/species, 
-            data = data, na.action= NULL)
+            data = model_input, na.action= NULL)
 # experienced_var_mean + realm
 fit7 <- lme(ARR ~ experienced_var_mean*realm_general2, random = ~1|order/family/genus/species, 
-            data = data, na.action= NULL)
+            data = model_input, na.action= NULL)
 # experienced_var_mean + body size + realm
 fit8 <- lme(ARR ~ experienced_var_mean*maximum_body_size_svl_hbl_cm+realm_general2, 
-            random = ~1|order/family/genus/species, data = data, na.action= NULL)
+            random = ~1|order/family/genus/species, data = model_input, na.action= NULL)
 
 model.sel(fit1,fit5, fit6, fit7, fit8)
 
