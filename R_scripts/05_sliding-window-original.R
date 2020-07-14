@@ -3,7 +3,7 @@ library(gdata)
 library(evobiR)
 library(tidyverse)
 
-intratherm <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
+intratherm <- read.csv("data-processed/intratherm_version-for-arr.csv", stringsAsFactors = FALSE)
 
 ## filter out rows of data we cannot use for tmax, sliding window/ARR analysis: no location data, no acclimation, tmin rows, no lifespan 
 intratherm <- intratherm %>%
@@ -15,9 +15,6 @@ intratherm <- intratherm %>%
   filter(parameter_tmax_or_tmin == "tmax") 
 intratherm <- drop.levels(intratherm)
 
-## convert lifespan to numeric
-intratherm$lifespan_days <- as.numeric(as.character(intratherm$lifespan_days))
-  
 ## convert seasons when away and inactive 
 intratherm <- convert_seasons_to_numeric(intratherm)
 
@@ -26,10 +23,10 @@ intratherm <- intratherm %>%
   mutate(population_id = as.character(paste(genus_species, latitude, longitude, sep = "_")))
 
 ## write to file:
-write.csv(intratherm, "./data-processed/intratherm_sliding-window-ready.csv", row.names = FALSE)
+write.csv(intratherm, "data-processed/intratherm_sliding-window-ready.csv", row.names = FALSE)
 
 ## begin sliding window 
-temp_data <- read_csv("./data-processed/arr_temp-data.csv")
+temp_data <- read_csv("data-processed/arr_temp-data.csv")
 
 cadillac <- intratherm 
 
@@ -149,7 +146,7 @@ merged <- left_join(intratherm, unique_pairs)
 
 
 ## write to file
-write.csv(merged, "./data-processed/arr_sliding-window-output.csv", row.names = FALSE)
+write.csv(merged, "data-processed/arr_sliding-window-output.csv", row.names = FALSE)
 
 
 #

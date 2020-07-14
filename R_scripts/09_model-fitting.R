@@ -19,11 +19,11 @@ data$ARR[which.min(data$experienced_var_mean)]
 
 ## add line representing other model fit:
 xs = c(1.797841, 15.37186)
-y1 = 0.005559816*1.797841 + 0.224658873 
-y2 = 0.005559816*15.37186 + 0.224658873 
+y1 = 0.0029170*1.797841 + 0.23400
+y2 = 0.0029170*15.37186 + 0.23400
 beta = c(y1, y2)
 
-geom_abline(a = 0.224658873, b = 0.005559816, from = 0, to = 12) 
+geom_abline(a = 0.23400, b = 0.0029170, from = 0, to = 12) 
 
 g = ggplot(model_input, aes(x = experienced_var_mean, y = ARR, col = abs(latitude))) + 
   geom_point() + 
@@ -33,7 +33,7 @@ g = ggplot(model_input, aes(x = experienced_var_mean, y = ARR, col = abs(latitud
   scale_colour_viridis_c(option = "A") + 
   geom_segment(aes(x = xs[1], xend = xs[2], y = beta[1], yend = beta[2]), colour = "black",lty = "dashed")
 
-ggsave("./Figures/experienced-var-vs-arr.png", g)
+ggsave("Figures/experienced-var-vs-arr.png", g)
   
 
 

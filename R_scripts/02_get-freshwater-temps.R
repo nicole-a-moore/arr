@@ -18,7 +18,7 @@ nc_close(ncfile)
 
 
 ## bring in population data
-cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
+cadillac <- read.csv("./data-raw/intratherm-with-elev.csv")
 
 ## filter out rows of data we cannot use  
 cadillac <- cadillac %>%

@@ -20,7 +20,7 @@ class(world)
 ##all data must be in sf format
 
 
-data <- read.csv("./data-processed/arr_sliding-window-output-with-arr.csv")
+data <- read.csv("data-processed/arr_sliding-window-output-with-arr.csv", stringsAsFactors = FALSE)
 ## get rid of multiple rows per population and ARRs less than 0.15
 model_input <- data %>%
   filter(!duplicated(population_id)) %>%
@@ -44,7 +44,7 @@ loc$Class <- reorder(loc$Class, loc$Frequency)
 
 
 ## make colour palette
-myPalette <- brewer.pal(n = length(unique(loc$Class)), name = "Dark2") 
+myPalette <-  colorRampPalette(brewer.pal(8, name = "Dark2"))(9)
 
 
 map = ggplot(data=world) + 

@@ -1,7 +1,4 @@
 ## script used to get temperature data for terrestrial species from Berkeley Earth gridded TMAX data 
-library(chron)
-library(RColorBrewer)
-library(lattice)
 library(ncdf4)
 library(janitor)
 library(tidyverse)
@@ -18,7 +15,7 @@ long <- ncvar_get(ncfile, "longitude")
 nc_close(ncfile)
 
 ## bring in data
-cadillac <- read.csv("./data-raw/intratherm-may-2020-squeaky-clean.csv")
+cadillac <- read.csv("data-processed/intratherm_version-for-arr.csv")
 
 ## filter out rows of data we cannot use  
 cadillac <- cadillac %>%
@@ -148,7 +145,6 @@ while (num_unique < nrow(unique_pairs)+1) {
 }
 
 temperature_data <- temperature_data[-1,]
-
 temperature_data <- readRDS("./data-processed/precious_temps_original.rds")
 
 ## figure out which are NA and why:
@@ -156,7 +152,7 @@ isNA <- select(temperature_data, as.vector(which(colSums(is.na(temperature_data)
 indexNA <- as.vector(which(colSums(is.na(temperature_data)) == nrow(temperature_data)))
 uniqueNA <- unique_pairs[indexNA-1,]
 
-## get rid of marine and freshwater missing columns as they are unlikely to be available:
+## get rid of marine and freshwater missing columns as they are unlikely to be available or accurate:
 uniqueNA <- uniqueNA %>%
   filter(realm_general2 == "Terrestrial") %>%
   mutate(population_id = as.character(paste(genus_species, latitude, longitude, sep = "_")))
@@ -176,42 +172,44 @@ while (x < length(uniqueNA$genus_species) + 1) {
 
 #### find new grid squares by looking on google maps:
 ## move closer to Boston land mass:
-missing_long[1] <- -70.5
-missing_lat[1] <- 41.5
+missing_long[7] <- -70.5
+missing_lat[7] <- 41.5
 
 ## five are on Martinique
-missing_long[2:6] <- -60.5
-missing_lat[2:6] <- 14.5
+missing_long[1:5] <- -60.5
+missing_lat[1:5] <- 14.5
 
-## for intratherm_id 2531, no accurate temp data can be obtained since no data for island of St. Croix
-missing_long[7] <- NA
-missing_lat[7] <- NA
+## no accurate temp data can be obtained since no data for island of St. Croix
+missing_long[8] <- NA
+missing_lat[8] <- NA
 
 ## Buchan, Victoria:
-missing_long[8] <- 148.5
-missing_lat[8] <- -37.5
+missing_long[9] <- 148.5
+missing_lat[9] <- -37.5
 
 ## Murrindal, Victoria
-missing_long[9] <- 148.5
-missing_lat[9]<- -36.5
+missing_long[10] <- 148.5
+missing_lat[10]<- -36.5
 
 ## Godsford, NSW:
-missing_long[10] <- 150.5
-missing_lat[10]<- -33.5
-missing_long[12] <- 150.5
-missing_lat[12]<- -33.5
+missing_long[11] <- 150.5
+missing_lat[11]<- -33.5
+missing_long[13] <- 150.5
+missing_lat[13]<- -33.5
 
 ## Wilson's Promontory National Park, Victoria
-missing_long[11] <- 146.5
-missing_lat[11] <- -38.5
+missing_long[12] <- 146.5
+missing_lat[12] <- -38.5
 
-## "Supplier" in location description of intratherm_id 1431 means probably not a real collection location
-missing_long[13] <- NA
-missing_lat[13] <- NA
-
-## for intratherm_id 2082, no accurate temp data can be obtained since island 
+## no accurate temp data can be obtained since island 
+missing_long[6] <- NA
+missing_lat[6] <- NA
 missing_long[14] <- NA
 missing_lat[14] <- NA
+
+## Coconut grove miami:
+missing_long[15:16] <- -80.5
+missing_lat[14] <- -80.5
 
 
 ##assign new lats and longs to use when getting temp data 
@@ -231,7 +229,7 @@ while (num_unique < length(uniqueNA$population_id) + 1) {
   while (rep < 2020) {
     print(paste("On population number ", num_unique, ", getting temp data from ", rep, sep = ""))
     ## read in gridded data in nc file for the file_index from berkeley earth and store data in R workspace 
-    filename <- paste("./Gridded_daily_TMAX/Complete_TMAX_Daily_LatLong1_", rep, ".nc", sep = "")
+    filename <- paste("Gridded_daily_TMAX/Complete_TMAX_Daily_LatLong1_", rep, ".nc", sep = "")
     ncfile <- nc_open(filename)
     
     ## create variables for things needed to use data
@@ -332,7 +330,7 @@ while (num_unique < length(uniqueNA$population_id) + 1) {
 
 
 temperature_data_NA <- temperature_data_NA[-1,]
-temperature_data_NA <- readRDS("./data-processed/arr_precious_NA_temps.rds") %>%
+temperature_data_NA <- readRDS("data-processed/arr_precious_NA_temps.rds") %>%
   select(-date)
 
 ##combine:
@@ -375,7 +373,7 @@ while (z < nrow(populations) + 1) {
 
 
 ## write to file
-write.csv(temperature_data, "./data-processed/arr_temp-data.csv", row.names = FALSE)
+write.csv(temperature_data, "data-processed/arr_temp-data.csv", row.names = FALSE)
 
 
 

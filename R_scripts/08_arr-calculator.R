@@ -8,7 +8,7 @@ library(viridis)
 library(nlme)
 
 ## read in files
-intratherm <- read.csv( "./data-processed/arr_sliding-window-output.csv") ## version of the database with only usable data and experienced variation column 
+intratherm <- read.csv( "data-processed/arr_sliding-window-output.csv") ## version of the database with only usable data and experienced variation column 
 
 ## get ARR:
 #make groups of each species for every lat and long
@@ -26,7 +26,7 @@ arr <- arr %>%
 intratherm <- left_join(intratherm, arr, by = "population_id")
 
 ## write to csv
-write.csv(intratherm, "./data-processed/arr_sliding-window-output-with-arr.csv", row.names = FALSE)
+write.csv(intratherm, "data-processed/arr_sliding-window-output-with-arr.csv", row.names = FALSE)
 
 ## write to file to make map + taxonomic breakdown from
 model_input <- intratherm %>%
@@ -35,7 +35,7 @@ model_input <- intratherm %>%
   filter(!is.na(experienced_var_mean)) %>%
   filter(!is.na(ARR))
 
-write.csv(intratherm2, "./data-processed/arr_map-and-model-input.csv", row.names = FALSE)
+write.csv(intratherm2, "data-processed/arr_map-and-model-input.csv", row.names = FALSE)
 
 
 
@@ -52,9 +52,9 @@ g = ggplot(data = intratherm, aes(x = acclim_temp, y = parameter_value, col = po
         panel.grid.major = element_line(colour = "white"), 
         plot.title = element_text(hjust = 0.5)) + 
   labs(x = "Acclimation temperature (°C)", y = "Upper critical thermal limit (°C)") + 
-  scale_color_manual(values = magma(726))
+  scale_color_manual(values = magma(750))
 
-ggsave(path = "./Figures/", filename = "ARR-model-fits-all.png", g, height = 6, width = 9)
+ggsave(path = "Figures/", filename = "ARR-model-fits-all.png", g, height = 6, width = 9)
 
 ## plot only ones included in model fitting 
 model_input_arr_fig <- intratherm %>%
@@ -77,7 +77,7 @@ g = ggplot(data = model_input_arr_fig, aes(x = acclim_temp, y = parameter_value,
        colour = paste(" Mean", "\n", "experienced", "\n", "variation")) +
   scale_colour_viridis_c(option = "A")
 
-ggsave(path = "./Figures/", filename = "ARR-model-fits-col-is-exp-var.png", g, height = 6, width = 10)
+ggsave(path = "Figures/", filename = "ARR-model-fits-col-is-exp-var.png", g, height = 6, width = 10)
 
 
 
